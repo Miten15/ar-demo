@@ -7,15 +7,14 @@ import ARViewer from "@/components/ARViewer";
 import QRCode from "@/components/QRCode";
 import Link from "next/link";
 
-interface ProductPageProps {
+interface PageProps {
   params: {
     productId: string;
   };
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function ProductPage({ params, searchParams }: ProductPageProps) {
+export default function ProductPage({ params }: PageProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isARSupported, setIsARSupported] = useState<boolean | null>(null);
