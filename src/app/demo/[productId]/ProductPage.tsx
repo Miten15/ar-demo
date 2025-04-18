@@ -10,11 +10,14 @@ import Link from "next/link";
 interface ProductPageProps {
   product: Product | null;
   productId: string;
+  initialView?: string; // Add the new prop that comes from searchParams
 }
 
-export default function ProductPage({ product, productId }: ProductPageProps) {
+export default function ProductPage({ product, productId, initialView }: ProductPageProps) {
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isARSupported, setIsARSupported] = useState<boolean | null>(null);
+  // Now we'll actually use this state variable for view switching
+  const [activeView, setActiveView] = useState<string>(initialView || "3d");
 
   useEffect(() => {
     // Get the current URL for QR code generation
@@ -31,7 +34,12 @@ export default function ProductPage({ product, productId }: ProductPageProps) {
     };
     
     checkARSupport();
-  }, [productId]);
+    
+    // Update active view if initialView changes
+    if (initialView) {
+      setActiveView(initialView);
+    }
+  }, [productId, initialView]);
 
   if (!product) {
     return (
@@ -43,6 +51,13 @@ export default function ProductPage({ product, productId }: ProductPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Show a debug note about the initial view if present (just for demonstration) */}
+      {initialView && (
+        <div className="bg-blue-50 text-blue-800 text-xs p-2 text-center">
+          View parameter: {initialView}
+        </div>
+      )}
+      
       {/* Navigation Bar */}
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,17 +81,55 @@ export default function ProductPage({ product, productId }: ProductPageProps) {
       </header>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* View switcher tabs */}
+        <div className="mb-6 flex justify-center sm:justify-start">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg flex">
+            <button 
+              className={`px-4 py-2 text-sm font-medium rounded-l-lg ${
+                activeView === "3d" 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              }`}
+              onClick={() => setActiveView("3d")}
+            >
+              3D View
+            </button>
+            <button 
+              className={`px-4 py-2 text-sm font-medium ${
+                activeView === "details" 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              }`}
+              onClick={() => setActiveView("details")}
+            >
+              Details
+            </button>
+            <button 
+              className={`px-4 py-2 text-sm font-medium rounded-r-lg ${
+                activeView === "ar" 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              }`}
+              onClick={() => setActiveView("ar")}
+            >
+              AR
+            </button>
+          </div>
+        </div>
+        
         {/* Product Details */}
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
             <div className="md:grid md:grid-cols-2">
-              {/* AR Viewer Section */}
-              <div className="h-[400px] md:h-[600px] relative">
+              {/* AR Viewer Section - show based on active view */}
+              <div className={`h-[400px] md:h-[600px] relative ${activeView !== "details" ? 'block' : 'hidden md:block'}`}>
                 <ARViewer
                   glbUrl={product.glbUrl}
                   usdzUrl={product.usdzUrl}
                   alt={product.name}
                   poster={product.image}
+                  // Adjust auto-rotate based on view
+                  autoRotate={activeView === "3d"}
                 />
                 
                 {/* AR Support Message */}
@@ -93,7 +146,7 @@ export default function ProductPage({ product, productId }: ProductPageProps) {
               </div>
               
               {/* Product Info Section */}
-              <div className="p-6 md:p-8">
+              <div className={`p-6 md:p-8 ${activeView === "details" ? 'col-span-2 md:col-span-1' : ''}`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h2>
@@ -113,33 +166,71 @@ export default function ProductPage({ product, productId }: ProductPageProps) {
                   </p>
                 </div>
                 
-                <div className="mt-8">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    View in Your Space
-                  </h3>
-                  
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row items-center gap-6">
-                      <div className="border-2 border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
-                        <QRCode url={currentUrl} size={150} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-2">Scan with your phone</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                          To view this {product.category} in AR, scan this QR code with your mobile device, then tap the &quot;View in AR&quot; button.
-                        </p>
-                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                          </svg>
-                          <span className="font-medium">AR compatible with iOS and Android devices</span>
+                {/* Only show QR section in AR view */}
+                {(activeView === "ar" || activeView === "3d") && (
+                  <div className="mt-8">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      View in Your Space
+                    </h3>
+                    
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 md:p-6">
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="border-2 border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
+                          <QRCode url={currentUrl} size={150} />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white mb-2">Scan with your phone</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                            To view this {product.category} in AR, scan this QR code with your mobile device, then tap the &quot;View in AR&quot; button.
+                          </p>
+                          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                              <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <span className="font-medium">AR compatible with iOS and Android devices</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
+                {/* Show more detailed specifications in details view */}
+                {activeView === "details" && (
+                  <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      Specifications
+                    </h3>
+                    <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Category</dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                          {product.category.charAt(0).toUpperCase() + product.category.slice(1)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Price</dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                          ${product.price.toFixed(2)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">ID</dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-white">
+                          {product.id}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">GLB File</dt>
+                        <dd className="mt-1 text-sm text-gray-900 dark:text-white truncate">
+                          {product.glbUrl}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                )}
+
                 <div className="mt-10 grid grid-cols-1 gap-4">
                   <button className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
