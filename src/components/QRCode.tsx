@@ -12,16 +12,19 @@ export default function QRCode({ url, size = 150 }: QRCodeProps) {
   const qrRef = useRef<HTMLDivElement>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
+  // Make sure we use absolute URLs for the QR code
+  const absoluteUrl = url.startsWith('http') ? url : `${typeof window !== 'undefined' ? window.location.origin : ''}${url}`;
+  
   useEffect(() => {
     // Only run this effect when the script is loaded and we have a URL
-    if (qrRef.current && isScriptLoaded && url) {
+    if (qrRef.current && isScriptLoaded && absoluteUrl) {
       try {
         qrRef.current.innerHTML = "";
         // Make sure QRCode exists on window before using it
         if (typeof window !== 'undefined' && window.QRCode) {
           new window.QRCode(qrRef.current, {
-            text: url,
+            text: absoluteUrl,
             width: size,
             height: size,
             colorDark: "#000000",
@@ -34,7 +37,7 @@ export default function QRCode({ url, size = 150 }: QRCodeProps) {
         setError("Failed to generate QR code");
       }
     }
-  }, [url, size, isScriptLoaded]);
+  }, [absoluteUrl, size, isScriptLoaded]);
 
   return (
     <>
@@ -49,10 +52,15 @@ export default function QRCode({ url, size = 150 }: QRCodeProps) {
           {error}
         </div>
       ) : (
-        <div ref={qrRef} className="flex items-center justify-center min-h-[100px] min-w-[100px]">
-          {!isScriptLoaded && (
-            <div className="animate-pulse h-full w-full bg-gray-200 dark:bg-gray-700 rounded-md"></div>
-          )}
+        <div>
+          <div ref={qrRef} className="flex items-center justify-center min-h-[100px] min-w-[100px] mb-2">
+            {!isScriptLoaded && (
+              <div className="animate-pulse h-full w-full bg-gray-200 dark:bg-gray-700 rounded-md"></div>
+            )}
+          </div>
+          <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-1">
+            Make sure you open this on your mobile device
+          </p>
         </div>
       )}
     </>

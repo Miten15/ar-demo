@@ -1,11 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Add proper CORS headers for model files
   async headers() {
     return [
       {
+        // Apply to all routes
         source: '/:path*',
         headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET',
+          },
           {
             key: 'Content-Security-Policy',
             value: `
@@ -25,11 +35,27 @@ const nextConfig = {
             `.replace(/\s{2,}/g, ' ').trim()
           }
         ]
-      }
-    ];
+      },
+      {
+        // Apply to model files
+        source: '/:path*(glb|usdz|gltf)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+          {
+            key: 'Content-Type',
+            value: 'model/gltf-binary',
+          },
+        ],
+      },
+    ]
   },
+  // Optimize images
   images: {
-    domains: [],
+    domains: ['your-domain.com'], // Add your domain where images are hosted
+    formats: ['image/webp'],
   },
   // Ensure that model files are treated as static assets
   webpack(config) {
@@ -47,6 +73,8 @@ const nextConfig = {
     
     return config;
   },
+  // Enable compression
+  compress: true,
 };
 
 module.exports = nextConfig;

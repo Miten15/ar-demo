@@ -16,7 +16,9 @@ interface ProductPageProps {
 export default function ProductPage({ product, productId, initialView }: ProductPageProps) {
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isARSupported, setIsARSupported] = useState<boolean | null>(null);
-  // Now we'll actually use this state variable for view switching
+  // Track if device is iOS for instructions
+  const [isIOS, setIsIOS] = useState<boolean>(false);
+  // Remove unused state variable
   const [activeView, setActiveView] = useState<string>(initialView || "3d");
 
   useEffect(() => {
@@ -27,10 +29,12 @@ export default function ProductPage({ product, productId, initialView }: Product
     const checkARSupport = () => {
       // iOS Safari
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
       // Android Chrome
-      const isAndroid = /android/i.test(navigator.userAgent);
-      setIsARSupported(isIOS || isAndroid);
+      const isAndroidDevice = /android/i.test(navigator.userAgent);
+      setIsIOS(isIOSDevice);
+      // We no longer need to set isAndroid state since we're not using it
+      setIsARSupported(isIOSDevice || isAndroidDevice);
     };
     
     checkARSupport();
@@ -183,7 +187,30 @@ export default function ProductPage({ product, productId, initialView }: Product
                           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                             To view this {product.category} in AR, scan this QR code with your mobile device, then tap the &quot;View in AR&quot; button.
                           </p>
-                          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                          
+                          {/* AR Instructions based on device type */}
+                          {isARSupported && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md mt-3 text-sm">
+                              <p className="font-medium mb-1">🔍 {isIOS ? 'iOS' : 'Android'} Instructions:</p>
+                              <ol className="list-decimal pl-5 space-y-1">
+                                <li>Tap the &quot;View in AR&quot; button when the model loads</li>
+                                <li>Allow camera access if prompted</li>
+                                {isIOS ? (
+                                  <>
+                                    <li>Position your phone over a flat surface</li>
+                                    <li>The {product.category} will appear in your environment</li>
+                                  </>
+                                ) : (
+                                  <>
+                                    <li>Move your phone around to detect surfaces</li>
+                                    <li>Tap on the surface where you want to place the {product.category}</li>
+                                  </>
+                                )}
+                              </ol>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mt-4">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
                               <circle cx="12" cy="12" r="3"></circle>

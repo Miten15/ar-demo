@@ -27,6 +27,16 @@ export default function ARViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  // Make sure URLs are absolute with proper encoding
+  const absoluteGlbUrl = glbUrl.startsWith('http') 
+    ? glbUrl 
+    : `${typeof window !== 'undefined' ? window.location.origin : ''}${glbUrl}`;
+    
+  const absoluteUsdzUrl = usdzUrl.startsWith('http') 
+    ? usdzUrl 
+    : `${typeof window !== 'undefined' ? window.location.origin : ''}${usdzUrl}`;
 
   useEffect(() => {
     // Make sure this code only runs on the client
@@ -39,13 +49,16 @@ export default function ARViewer({
         const modelViewer = document.createElement('model-viewer') as HTMLElement;
         
         // Set attributes - use setAttribute consistently instead of direct property assignment
-        modelViewer.setAttribute('src', glbUrl);
-        modelViewer.setAttribute('ios-src', usdzUrl);
+        modelViewer.setAttribute('src', absoluteGlbUrl);
+        modelViewer.setAttribute('ios-src', absoluteUsdzUrl);
         modelViewer.setAttribute('alt', alt);
         if (poster) modelViewer.setAttribute('poster', poster);
         modelViewer.setAttribute('ar', '');
         modelViewer.setAttribute('ar-modes', 'scene-viewer webxr quick-look');
         modelViewer.setAttribute('ar-scale', 'fixed');
+        modelViewer.setAttribute('quick-look-browsers', 'safari chrome');
+        modelViewer.setAttribute('touch-action', 'pan-y');
+        modelViewer.setAttribute('reveal', 'auto');
         if (cameraControls) modelViewer.setAttribute('camera-controls', '');
         if (autoRotate) modelViewer.setAttribute('auto-rotate', '');
         modelViewer.setAttribute('exposure', exposure.toString());
@@ -55,6 +68,18 @@ export default function ARViewer({
         modelViewer.style.width = '100%';
         modelViewer.style.height = '100%';
         modelViewer.classList.add('w-full', 'h-full', 'min-h-[400px]', 'max-w-full');
+
+        // Add loading progress event
+        modelViewer.addEventListener('progress', (event) => {
+          // @ts-expect-error - progress event is not in the type definitions
+          const progress = event.detail.totalProgress * 100;
+          setLoadingProgress(Math.round(progress));
+        });
+        
+        // Add error event
+        modelViewer.addEventListener('error', () => {
+          setError('Failed to load 3D model. Please try again later.');
+        });
 
         // Create AR button
         const button = document.createElement('button');
@@ -91,7 +116,7 @@ export default function ARViewer({
         setError("Failed to load 3D viewer");
       }
     }
-  }, [glbUrl, usdzUrl, alt, poster, cameraControls, autoRotate, exposure, shadowIntensity, scriptLoaded]);
+  }, [absoluteGlbUrl, absoluteUsdzUrl, alt, poster, cameraControls, autoRotate, exposure, shadowIntensity, scriptLoaded]);
 
   return (
     <>
@@ -114,12 +139,22 @@ export default function ARViewer({
             ref={containerRef} 
             className="w-full h-full flex items-center justify-center"
           >
-            {!scriptLoaded && (
+            {!scriptLoaded ? (
               <div className="flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Loading 3D viewer...</p>
               </div>
-            )}
+            ) : loadingProgress < 100 && loadingProgress > 0 ? (
+              <div className="flex flex-col items-center justify-center">
+                <div className="w-48 h-2 bg-gray-200 rounded-full mb-4">
+                  <div 
+                    className="h-full bg-blue-500 rounded-full" 
+                    style={{ width: `${loadingProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading 3D model: {loadingProgress}%</p>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
