@@ -94,7 +94,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">2. Scan QR Code</h3>
               <p className="mt-2 text-gray-500 dark:text-gray-300">
-                Use your phone to scan the product's QR code to launch the AR experience.
+                Use your phone to scan the product&apos;s QR code to launch the AR experience.
               </p>
             </div>
             
@@ -107,7 +107,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">3. Place in Your Space</h3>
               <p className="mt-2 text-gray-500 dark:text-gray-300">
-                Position the 3D model in your room using your phone's camera to see how it fits.
+                Position the 3D model in your room using your phone&apos;s camera to see how it fits.
               </p>
             </div>
           </div>

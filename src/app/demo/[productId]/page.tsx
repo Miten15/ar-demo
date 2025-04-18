@@ -6,7 +6,6 @@ import { Product } from "@/types/product";
 import ARViewer from "@/components/ARViewer";
 import QRCode from "@/components/QRCode";
 import Link from "next/link";
-import Image from "next/image";
 
 interface ProductPageProps {
   params: {
@@ -31,7 +30,8 @@ export default function ProductPage({ params }: ProductPageProps) {
     // Check if AR is supported
     const checkARSupport = () => {
       // iOS Safari
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
       // Android Chrome
       const isAndroid = /android/i.test(navigator.userAgent);
       setIsARSupported(isIOS || isAndroid);
@@ -133,7 +133,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900 dark:text-white mb-2">Scan with your phone</h4>
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                          To view this {product.category} in AR, scan this QR code with your mobile device, then tap the "View in AR" button.
+                          To view this {product.category} in AR, scan this QR code with your mobile device, then tap the &quot;View in AR&quot; button.
                         </p>
                         <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
