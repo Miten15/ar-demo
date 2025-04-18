@@ -11,9 +11,11 @@ interface ProductPageProps {
   params: {
     productId: string;
   };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
-export default function ProductPage({ params }: ProductPageProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function ProductPage({ params, searchParams }: ProductPageProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isARSupported, setIsARSupported] = useState<boolean | null>(null);
