@@ -60,9 +60,10 @@ export default function ARViewer({
         modelViewer.setAttribute("alt", alt);
         if (poster) modelViewer.setAttribute("poster", poster);
         modelViewer.setAttribute("ar", "");
-        modelViewer.setAttribute("ar-modes", "scene-viewer webxr quick-look");
-        modelViewer.setAttribute("ar-scale", "fixed");
-        modelViewer.setAttribute("quick-look-browsers", "safari chrome");
+        modelViewer.setAttribute("ar-modes", "webxr scene-viewer quick-look");
+        modelViewer.setAttribute("ar-scale", "auto");
+        modelViewer.setAttribute("interaction-prompt", "none");
+        modelViewer.setAttribute("ar-placement", "wall ceiling floor");
         modelViewer.setAttribute("touch-action", "pan-y");
         modelViewer.setAttribute("reveal", "auto");
         if (cameraControls) modelViewer.setAttribute("camera-controls", "");
@@ -71,20 +72,15 @@ export default function ARViewer({
         modelViewer.setAttribute("shadow-intensity", shadowIntensity.toString());
         modelViewer.setAttribute("environment-image", "neutral");
         modelViewer.setAttribute("camera-orbit", "0deg 75deg 2m");
+        modelViewer.setAttribute("ar-status", "not-presenting");
+        modelViewer.setAttribute("min-camera-orbit", "auto auto auto");
+        modelViewer.setAttribute("max-camera-orbit", "auto auto auto");
 
         // Apply scale and position attributes
         modelViewer.setAttribute("scale", `${scale} ${scale} ${scale}`);
         modelViewer.style.transform = `translate3d(${position.x * 10}px, ${
           position.y * 10
         }px, ${position.z * 10}px)`;
-
-        // Add ar-status attribute to enable model manipulation in AR
-        modelViewer.setAttribute("ar-status", "not-presenting");
-
-        // Add attributes for AR model manipulation
-        modelViewer.setAttribute("interaction-prompt", "none");
-        modelViewer.setAttribute("ar-placement", "floor");
-        modelViewer.setAttribute("ar-scale", "auto");
 
         modelViewer.style.width = "100%";
         modelViewer.style.height = "100%";

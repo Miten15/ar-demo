@@ -20,10 +20,6 @@ export default function ProductPage({ product, productId, initialView }: Product
   const [isIOS, setIsIOS] = useState<boolean>(false);
   // Remove unused state variable
   const [activeView, setActiveView] = useState<string>(initialView || "3d");
-  
-  // Add state for AR model scaling and positioning
-  const [modelScale, setModelScale] = useState<number>(1.0);
-  const [modelPosition, setModelPosition] = useState<{x: number, y: number, z: number}>({x: 0, y: 0, z: 0});
 
   useEffect(() => {
     // Generate AR-specific URL for QR code (with view=ar parameter)
@@ -50,19 +46,6 @@ export default function ProductPage({ product, productId, initialView }: Product
       setActiveView(initialView);
     }
   }, [productId, initialView]);
-
-  // Helper function to handle model scale changes
-  const handleScaleChange = (newScale: number) => {
-    setModelScale(Math.max(0.5, Math.min(2.0, newScale))); // Limit scale between 0.5x and 2.0x
-  };
-  
-  // Helper function to handle model position changes
-  const handlePositionChange = (axis: 'x'|'y'|'z', value: number) => {
-    setModelPosition(prev => ({
-      ...prev,
-      [axis]: value
-    }));
-  };
 
   if (!product) {
     return (
@@ -153,67 +136,7 @@ export default function ProductPage({ product, productId, initialView }: Product
                   poster={product.image}
                   // Adjust auto-rotate based on view
                   autoRotate={activeView === "3d"}
-                  // Pass scale and position to ARViewer
-                  scale={modelScale}
-                  position={modelPosition}
                 />
-                
-                {/* AR Model Controls - only show in AR view */}
-                {activeView === "ar" && (
-                  <div className="absolute bottom-16 left-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 z-10 text-sm">
-                    <div className="mb-3">
-                      <label className="block text-gray-700 dark:text-gray-300 mb-1">Size: {modelScale.toFixed(1)}x</label>
-                      <input 
-                        type="range" 
-                        min="0.5" 
-                        max="2.0" 
-                        step="0.1" 
-                        value={modelScale}
-                        onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-1">X: {modelPosition.x.toFixed(1)}</label>
-                        <input 
-                          type="range" 
-                          min="-5" 
-                          max="5" 
-                          step="0.1" 
-                          value={modelPosition.x}
-                          onChange={(e) => handlePositionChange('x', parseFloat(e.target.value))}
-                          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-1">Y: {modelPosition.y.toFixed(1)}</label>
-                        <input 
-                          type="range" 
-                          min="-5" 
-                          max="5" 
-                          step="0.1" 
-                          value={modelPosition.y}
-                          onChange={(e) => handlePositionChange('y', parseFloat(e.target.value))}
-                          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-1">Z: {modelPosition.z.toFixed(1)}</label>
-                        <input 
-                          type="range" 
-                          min="-5" 
-                          max="5" 
-                          step="0.1" 
-                          value={modelPosition.z}
-                          onChange={(e) => handlePositionChange('z', parseFloat(e.target.value))}
-                          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
                 
                 {/* AR Support Message */}
                 {isARSupported === false && (
@@ -264,7 +187,7 @@ export default function ProductPage({ product, productId, initialView }: Product
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900 dark:text-white mb-2">Scan with your phone</h4>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            To view this {product.category} in AR, scan this QR code with your mobile device. The AR view will open automatically with controls to resize and reposition the model.
+                            To view this {product.category} in AR, scan this QR code with your mobile device. You will be able to rotate and position the model freely in your space.
                           </p>
                           
                           {/* AR Instructions based on device type */}
@@ -278,11 +201,13 @@ export default function ProductPage({ product, productId, initialView }: Product
                                   <>
                                     <li>Position your phone over a flat surface</li>
                                     <li>The {product.category} will appear in your environment</li>
+                                    <li>Use two fingers to rotate, move, or resize the model</li>
                                   </>
                                 ) : (
                                   <>
                                     <li>Move your phone around to detect surfaces</li>
                                     <li>Tap on the surface where you want to place the {product.category}</li>
+                                    <li>Use pinch gestures to resize and drag to reposition the model</li>
                                   </>
                                 )}
                               </ol>
