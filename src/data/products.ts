@@ -1,5 +1,6 @@
 import { Product } from "@/types/product";
 
+// Make sure paths are absolute for deployment
 export const products: Product[] = [
   {
     id: "lego-light",

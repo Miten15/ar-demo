@@ -1,36 +1,58 @@
-// Server Component
-import { products } from "@/data/products";
-import ProductPage from "./ProductPage";
-import { Metadata } from "next";
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { products } from '@/data/products';
+import ProductPage from './ProductPage';
 
-type Props = {
-  params: { productId: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+interface Props {
+  params: Promise<{ productId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // Generate metadata for the page
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
-  const product = products.find(p => p.id === params.productId);
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+  
+  const product = products.find(p => p.id === resolvedParams.productId);
+  
+  // If product doesn't exist, we'll handle this in the page component
+  if (!product) {
+    return {
+      title: 'Product Not Found',
+      description: 'The requested product could not be found.'
+    };
+  }
   
   // Using searchParams to potentially customize the metadata
-  const highlight = typeof searchParams.highlight === 'string' ? searchParams.highlight : undefined;
+  const highlight = typeof resolvedSearchParams.highlight === 'string' ? resolvedSearchParams.highlight : undefined;
   
   return {
-    title: product ? `${product.name} - AR View${highlight ? ` (${highlight})` : ''}` : 'Product Not Found',
-    description: product?.description || 'View this product in augmented reality'
+    title: `${product.name} - AR View${highlight ? ` (${highlight})` : ''}`,
+    description: product.description,
+    openGraph: {
+      title: `View ${product.name} in Augmented Reality`,
+      description: product.description,
+      images: [{ url: product.image, width: 1200, height: 630 }]
+    }
   };
 }
 
-// Use the appropriate type annotation and make the component async
 export default async function Page({ params, searchParams }: Props) {
-  // Find the product on the server
-  const product = products.find((p) => p.id === params.productId) || null;
+  // Await params and searchParams
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
   
-  // Pass both product and searchParams to the client component
-  // This allows features like highlighting, initial settings, etc. to be controlled via URL
-  return <ProductPage 
-    product={product} 
-    productId={params.productId} 
-    initialView={searchParams.view as string | undefined}
+  // Find the product on the server
+  const product = products.find((p) => p.id === resolvedParams.productId);
+  
+  // If product doesn't exist, show 404 page
+  if (!product) {
+    notFound();
+  }
+  
+  return <ProductPage
+    product={product}
+    productId={resolvedParams.productId}
+    initialView={resolvedSearchParams.view as string | undefined}       
   />;
 }
