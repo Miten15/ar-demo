@@ -32,7 +32,7 @@ export default function ARViewer({
   alt,
   poster,
   exposure = 1,
-  shadowIntensity = 1,
+  shadowIntensity = 0.8, // Reduced for better performance
   cameraControls = true,
   autoRotate = false,
   scale = 1,
@@ -45,6 +45,7 @@ export default function ARViewer({
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [inARMode, setInARMode] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
   
   // Use refs to track component state without re-renders
   const modelViewerCreated = useRef(false);
@@ -91,6 +92,15 @@ export default function ARViewer({
     
     // Mark this component as mounting the model viewer
     modelViewerCreated.current = true;
+
+    // Create a logging function that respects mounting state
+    const logMessage = (message: string) => {
+      if (isMounted.current) {
+        console.log(`AR Viewer: ${message}`);
+      }
+    };
+
+    logMessage("Initializing AR viewer");
     
     // Create a container div for model-viewer that won't conflict with React's DOM operations
     const modelViewerContainer = document.createElement('div');
@@ -105,6 +115,7 @@ export default function ARViewer({
     }
     
     // Create the model-viewer element
+    logMessage("Creating model-viewer element");
     const modelViewer = document.createElement('model-viewer') as ModelViewerElement;
     modelViewerRef.current = modelViewer;
     
@@ -114,20 +125,30 @@ export default function ARViewer({
     if (poster) modelViewer.poster = poster;
     modelViewer.setAttribute('ar', '');
     modelViewer.setAttribute('ios-src', absoluteUsdzUrl);
+    
+    // Performance optimizations
     modelViewer.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
     modelViewer.setAttribute('ar-scale', 'auto');
-    modelViewer.setAttribute('interaction-prompt', 'none');
-    modelViewer.setAttribute('ar-placement', 'floor');
-    modelViewer.setAttribute('ar-status', 'not-presenting');
+    modelViewer.setAttribute('skybox-image', 'none'); // Disable skybox for better performance
+    modelViewer.setAttribute('environment-image', 'neutral'); // Use simpler environment
+    modelViewer.setAttribute('shadow-intensity', shadowIntensity.toString());
+    modelViewer.setAttribute('camera-target', '0 0 0'); // Center the camera target
+    modelViewer.setAttribute('interaction-prompt', 'none'); // Disable interaction prompt
+    modelViewer.setAttribute('ar-placement', 'floor'); // Default placement on floor
     modelViewer.setAttribute('touch-action', 'pan-y');
     modelViewer.setAttribute('reveal', 'auto');
+    modelViewer.setAttribute('loading', 'eager'); // Load eagerly
+    
+    // Mobile optimizations
+    if (isMobileDevice) {
+      modelViewer.setAttribute('max-field-of-view', '60deg'); // Limit FOV on mobile
+      modelViewer.setAttribute('interpolation-decay', '200'); // Smoother animations
+    }
     
     if (cameraControls) modelViewer.setAttribute('camera-controls', '');
     if (autoRotate) modelViewer.setAttribute('auto-rotate', '');
     
     modelViewer.setAttribute('exposure', exposure.toString());
-    modelViewer.setAttribute('shadow-intensity', shadowIntensity.toString());
-    modelViewer.setAttribute('environment-image', 'neutral');
     modelViewer.setAttribute('camera-orbit', '0deg 75deg 2m');
     modelViewer.setAttribute('scale', `${scale} ${scale} ${scale}`);
     
@@ -145,8 +166,18 @@ export default function ARViewer({
       if (fullscreenAR) {
         modelViewer.setAttribute('camera-controls', '');
         modelViewer.setAttribute('interaction-prompt', 'none');
-        if (!isIOSDevice) {
+        
+        // iOS-specific optimizations
+        if (isIOSDevice) {
+          // These settings should help iOS Quick Look handle the model better
+          modelViewer.setAttribute('quick-look-browsers', 'safari');
+          modelViewer.setAttribute('ar-scale', 'auto');
+          logMessage("Optimized for iOS device");
+        } else {
+          // Android-specific optimizations
           modelViewer.setAttribute('quick-look-browsers', 'safari chrome');
+          modelViewer.setAttribute('ar-status', 'not-presenting');
+          logMessage("Optimized for Android device");
         }
       }
     }
@@ -154,6 +185,7 @@ export default function ARViewer({
     // Style the model-viewer
     modelViewer.style.width = '100%';
     modelViewer.style.height = '100%';
+    modelViewer.style.backgroundColor = 'transparent';
     
     // Create and add AR button
     const button = document.createElement('button');
@@ -174,29 +206,40 @@ export default function ARViewer({
       if (!isMounted.current) return;
       // @ts-expect-error - progress event is not in the type definitions
       const progress = event.detail.totalProgress * 100;
-      setLoadingProgress(Math.round(progress));
+      const progressValue = Math.round(progress);
+      setLoadingProgress(progressValue);
+      logMessage(`Loading progress: ${progressValue}%`);
     };
     
     modelViewer.addEventListener('progress', progressHandler);
     
     // Add error event listener
-    const errorHandler = () => {
+    const errorHandler = (event: ErrorEvent) => {
       if (!isMounted.current) return;
+      console.error('Model viewer error:', event);
       setError('Failed to load 3D model. Please try again later.');
     };
     
-    modelViewer.addEventListener('error', errorHandler);
+    modelViewer.addEventListener('error', errorHandler as EventListener);
     
     // Add AR status event listener
     const arStatusHandler = (event: Event) => {
       if (!isMounted.current) return;
-      // @ts-expect-error - custom event
-      const status = event.detail.status;
-      if (status === 'session-started') {
-        setInARMode(true);
-        modelViewer.setAttribute('ar-scale', 'fixed');
-      } else if (status === 'session-ended' || status === 'not-presenting') {
-        setInARMode(false);
+      try {
+        // @ts-expect-error - custom event
+        const status = event.detail.status;
+        logMessage(`AR status changed: ${status}`);
+        if (status === 'session-started') {
+          setInARMode(true);
+          modelViewer.setAttribute('ar-scale', 'fixed');
+        } else if (status === 'session-ended' || status === 'not-presenting') {
+          setInARMode(false);
+        } else if (status === 'failed') {
+          // AR failed to start
+          setError('AR mode failed to start. Please try again or use a different device.');
+        }
+      } catch (e) {
+        console.error('Error handling AR status:', e);
       }
     };
     
@@ -206,19 +249,36 @@ export default function ARViewer({
     const loadHandler = () => {
       if (!isMounted.current) return;
       setLoadingProgress(100);
+      setModelLoaded(true);
+      logMessage("Model loaded successfully");
     };
     
     modelViewer.addEventListener('load', loadHandler);
+
+    // Add preload handler
+    const preloadHandler = () => {
+      if (!isMounted.current) return;
+      logMessage("Model preloaded");
+    };
+    
+    modelViewer.addEventListener('preload', preloadHandler);
     
     // Append to the container
     modelViewerContainer.appendChild(modelViewer);
     
     // Store event handlers for cleanup
-    const eventHandlers = { progressHandler, errorHandler, arStatusHandler, loadHandler };
+    const eventHandlers = { 
+      progressHandler, 
+      errorHandler: errorHandler as EventListener, 
+      arStatusHandler, 
+      loadHandler, 
+      preloadHandler 
+    };
     
     // Cleanup function
     return () => {
       // Mark as unmounted
+      logMessage("Cleaning up AR viewer");
       isMounted.current = false;
       modelViewerCreated.current = false;
       
@@ -229,6 +289,7 @@ export default function ARViewer({
         mv.removeEventListener('error', eventHandlers.errorHandler);
         mv.removeEventListener('ar-status', eventHandlers.arStatusHandler);
         mv.removeEventListener('load', eventHandlers.loadHandler);
+        mv.removeEventListener('preload', eventHandlers.preloadHandler);
       }
       
       // Save references to elements we need to clean up
@@ -269,8 +330,11 @@ export default function ARViewer({
       <Script
         type="module"
         src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"
-        strategy="afterInteractive"
-        onLoad={() => setScriptLoaded(true)}
+        strategy="lazyOnload" // Changed to lazyOnload for better overall page load performance
+        onLoad={() => {
+          console.log("Model viewer script loaded");
+          setScriptLoaded(true);
+        }}
         onError={() => setError("Failed to load 3D viewer library")}
       />
 

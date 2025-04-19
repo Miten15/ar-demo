@@ -6,10 +6,10 @@ export const products: Product[] = [
     name: "Track Spot Light",
     description: "Modern track spot light with adjustable head for focused illumination. Perfect for highlighting artwork, architectural features, or creating directed light in any space.",
     price: 89.99,
-    category: "lamp",
+    category: "lighting",
     image: "/images/table-lamp.jpg", // Placeholder image
     glbUrl: "/models/Track_Spot_v02.glb",
-    usdzUrl: "/models/table-lamp.usdz", // Using as fallback for iOS
+    usdzUrl: "/models/pendant-light.usdz", // Using pendant light as it's likely closer to track spot in appearance
     featured: true,
   }
 ];
