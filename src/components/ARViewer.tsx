@@ -16,6 +16,16 @@ interface ARViewerProps {
   position?: { x: number; y: number; z: number };
 }
 
+// Define an interface for model-viewer element to fix TypeScript errors
+interface ModelViewerElement extends HTMLElement {
+  src: string;
+  alt: string;
+  poster?: string;
+  setAttribute(name: string, value: string): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+}
+
 export default function ARViewer({
   glbUrl,
   usdzUrl,
@@ -32,8 +42,17 @@ export default function ARViewer({
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
-
-  // Make sure URLs are absolute with proper encoding
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [inARMode, setInARMode] = useState(false);
+  
+  // Use refs to track component state without re-renders
+  const modelViewerCreated = useRef(false);
+  const modelViewerRef = useRef<ModelViewerElement | null>(null);
+  const isMounted = useRef(true);
+  const containerRefValue = useRef<HTMLDivElement | null>(null);
+  
+  // Make URLs absolute
   const absoluteGlbUrl = glbUrl.startsWith("http")
     ? glbUrl
     : `${typeof window !== "undefined" ? window.location.origin : ""}${glbUrl}`;
@@ -42,131 +61,207 @@ export default function ARViewer({
     ? usdzUrl
     : `${typeof window !== "undefined" ? window.location.origin : ""}${usdzUrl}`;
 
+  // Check device type on mount
   useEffect(() => {
-    // Make sure this code only runs on the client
-    if (typeof window !== "undefined" && containerRef.current && scriptLoaded) {
-      try {
-        // Clear previous content
-        containerRef.current.innerHTML = "";
-
-        // Create model-viewer element with proper type casting
-        const modelViewer = document.createElement(
-          "model-viewer"
-        ) as HTMLElement;
-
-        // Set attributes - use setAttribute consistently instead of direct property assignment
-        modelViewer.setAttribute("src", absoluteGlbUrl);
-        modelViewer.setAttribute("ios-src", absoluteUsdzUrl);
-        modelViewer.setAttribute("alt", alt);
-        if (poster) modelViewer.setAttribute("poster", poster);
-        modelViewer.setAttribute("ar", "");
-        modelViewer.setAttribute("ar-modes", "webxr scene-viewer quick-look");
-        modelViewer.setAttribute("ar-scale", "auto");
-        modelViewer.setAttribute("interaction-prompt", "none");
-        modelViewer.setAttribute("ar-placement", "wall ceiling floor");
-        modelViewer.setAttribute("touch-action", "pan-y");
-        modelViewer.setAttribute("reveal", "auto");
-        if (cameraControls) modelViewer.setAttribute("camera-controls", "");
-        if (autoRotate) modelViewer.setAttribute("auto-rotate", "");
-        modelViewer.setAttribute("exposure", exposure.toString());
-        modelViewer.setAttribute("shadow-intensity", shadowIntensity.toString());
-        modelViewer.setAttribute("environment-image", "neutral");
-        modelViewer.setAttribute("camera-orbit", "0deg 75deg 2m");
-        modelViewer.setAttribute("ar-status", "not-presenting");
-        modelViewer.setAttribute("min-camera-orbit", "auto auto auto");
-        modelViewer.setAttribute("max-camera-orbit", "auto auto auto");
-
-        // Apply scale and position attributes
-        modelViewer.setAttribute("scale", `${scale} ${scale} ${scale}`);
-        modelViewer.style.transform = `translate3d(${position.x * 10}px, ${
-          position.y * 10
-        }px, ${position.z * 10}px)`;
-
-        modelViewer.style.width = "100%";
-        modelViewer.style.height = "100%";
-        modelViewer.classList.add(
-          "w-full",
-          "h-full",
-          "min-h-[400px]",
-          "max-w-full"
-        );
-
-        // Add loading progress event
-        modelViewer.addEventListener("progress", (event) => {
-          // @ts-expect-error - progress event is not in the type definitions
-          const progress = event.detail.totalProgress * 100;
-          setLoadingProgress(Math.round(progress));
-        });
-
-        // Add error event
-        modelViewer.addEventListener("error", () => {
-          setError("Failed to load 3D model. Please try again later.");
-        });
-
-        // Create AR button
-        const button = document.createElement("button");
-        button.slot = "ar-button";
-        button.className =
-          "absolute bottom-5 right-5 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg flex items-center gap-2";
-
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("width", "24");
-        svg.setAttribute("height", "24");
-        svg.setAttribute("viewBox", "0 0 24 24");
-        svg.setAttribute("fill", "none");
-        svg.setAttribute("stroke", "currentColor");
-        svg.setAttribute("stroke-width", "2");
-        svg.setAttribute("stroke-linecap", "round");
-        svg.setAttribute("stroke-linejoin", "round");
-
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M17.25 8.25 21 12m0 0-3.75 3.75M21 12h-9");
-
-        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        circle.setAttribute("cx", "8");
-        circle.setAttribute("cy", "12");
-        circle.setAttribute("r", "6");
-
-        svg.appendChild(path);
-        svg.appendChild(circle);
-        button.appendChild(svg);
-        button.appendChild(document.createTextNode("View in AR"));
-
-        // Add scale information
-        const arScale = document.createElement("div");
-        arScale.slot = "ar-scale";
-        arScale.innerHTML = `Scale: <span id="scale-display">${scale}x</span>`;
-        arScale.className =
-          "absolute top-5 left-5 bg-white rounded-lg px-3 py-1 shadow text-sm font-medium";
-
-        modelViewer.appendChild(button);
-        modelViewer.appendChild(arScale);
-        containerRef.current.appendChild(modelViewer);
-
-        // Update model scale and position when props change
-        modelViewer.addEventListener("ar-status", (event) => {
-          if ((event as CustomEvent).detail.status === "session-started") {
-            // Enable pinch-to-scale and drag-to-move in AR
-            modelViewer.setAttribute("ar-modes", "scene-viewer webxr quick-look");
-          }
-        });
-      } catch (err) {
-        console.error("Error creating model-viewer:", err);
-        setError("Failed to load 3D viewer");
+    if (typeof window !== 'undefined') {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const mobileDevice = /iphone|ipad|ipod|android|mobile|tablet/.test(userAgent);
+      setIsMobileDevice(mobileDevice);
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const iOS = /ipad|iphone|ipod/.test(userAgent) && !(window as any).MSStream;
+      setIsIOSDevice(iOS);
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
+  // Capture current containerRef value to avoid stale refs in cleanup
+  useEffect(() => {
+    containerRefValue.current = containerRef.current;
+  });
+  
+  // This effect handles model-viewer initialization and cleanup
+  useEffect(() => {
+    // Don't run if script isn't loaded or we already created the model viewer
+    if (!scriptLoaded || !containerRef.current || modelViewerCreated.current) return;
+    
+    // Mark this component as mounting the model viewer
+    modelViewerCreated.current = true;
+    
+    // Create a container div for model-viewer that won't conflict with React's DOM operations
+    const modelViewerContainer = document.createElement('div');
+    modelViewerContainer.style.width = '100%';
+    modelViewerContainer.style.height = '100%';
+    modelViewerContainer.dataset.arViewerContainer = 'true';
+    
+    // Empty container first to avoid duplicates
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+      containerRef.current.appendChild(modelViewerContainer);
+    }
+    
+    // Create the model-viewer element
+    const modelViewer = document.createElement('model-viewer') as ModelViewerElement;
+    modelViewerRef.current = modelViewer;
+    
+    // Configure model-viewer attributes
+    modelViewer.src = absoluteGlbUrl;
+    modelViewer.alt = alt;
+    if (poster) modelViewer.poster = poster;
+    modelViewer.setAttribute('ar', '');
+    modelViewer.setAttribute('ios-src', absoluteUsdzUrl);
+    modelViewer.setAttribute('ar-modes', 'webxr scene-viewer quick-look');
+    modelViewer.setAttribute('ar-scale', 'auto');
+    modelViewer.setAttribute('interaction-prompt', 'none');
+    modelViewer.setAttribute('ar-placement', 'floor');
+    modelViewer.setAttribute('ar-status', 'not-presenting');
+    modelViewer.setAttribute('touch-action', 'pan-y');
+    modelViewer.setAttribute('reveal', 'auto');
+    
+    if (cameraControls) modelViewer.setAttribute('camera-controls', '');
+    if (autoRotate) modelViewer.setAttribute('auto-rotate', '');
+    
+    modelViewer.setAttribute('exposure', exposure.toString());
+    modelViewer.setAttribute('shadow-intensity', shadowIntensity.toString());
+    modelViewer.setAttribute('environment-image', 'neutral');
+    modelViewer.setAttribute('camera-orbit', '0deg 75deg 2m');
+    modelViewer.setAttribute('scale', `${scale} ${scale} ${scale}`);
+    
+    // Apply position transform
+    if (position) {
+      modelViewer.style.transform = `translate3d(${position.x * 10}px, ${position.y * 10}px, ${position.z * 10}px)`;
+    }
+    
+    // Mobile-specific settings
+    if (isMobileDevice) {
+      // Check if we're in fullscreen AR mode (URL has ar=true)
+      const urlParams = new URLSearchParams(window.location.search);
+      const fullscreenAR = urlParams.get('ar') === 'true';
+      
+      if (fullscreenAR) {
+        modelViewer.setAttribute('camera-controls', '');
+        modelViewer.setAttribute('interaction-prompt', 'none');
+        if (!isIOSDevice) {
+          modelViewer.setAttribute('quick-look-browsers', 'safari chrome');
+        }
       }
     }
+    
+    // Style the model-viewer
+    modelViewer.style.width = '100%';
+    modelViewer.style.height = '100%';
+    
+    // Create and add AR button
+    const button = document.createElement('button');
+    button.slot = 'ar-button';
+    button.className = 'absolute bottom-5 right-5 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center gap-2 shadow-lg';
+    button.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" 
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17.25 8.25 21 12m0 0-3.75 3.75M21 12h-9"></path>
+        <circle cx="8" cy="12" r="6"></circle>
+      </svg>
+      ${isMobileDevice ? "View in your space" : "View in AR"}
+    `;
+    modelViewer.appendChild(button);
+    
+    // Add progress event listener
+    const progressHandler = (event: Event) => {
+      if (!isMounted.current) return;
+      // @ts-expect-error - progress event is not in the type definitions
+      const progress = event.detail.totalProgress * 100;
+      setLoadingProgress(Math.round(progress));
+    };
+    
+    modelViewer.addEventListener('progress', progressHandler);
+    
+    // Add error event listener
+    const errorHandler = () => {
+      if (!isMounted.current) return;
+      setError('Failed to load 3D model. Please try again later.');
+    };
+    
+    modelViewer.addEventListener('error', errorHandler);
+    
+    // Add AR status event listener
+    const arStatusHandler = (event: Event) => {
+      if (!isMounted.current) return;
+      // @ts-expect-error - custom event
+      const status = event.detail.status;
+      if (status === 'session-started') {
+        setInARMode(true);
+        modelViewer.setAttribute('ar-scale', 'fixed');
+      } else if (status === 'session-ended' || status === 'not-presenting') {
+        setInARMode(false);
+      }
+    };
+    
+    modelViewer.addEventListener('ar-status', arStatusHandler);
+    
+    // Add load event listener
+    const loadHandler = () => {
+      if (!isMounted.current) return;
+      setLoadingProgress(100);
+    };
+    
+    modelViewer.addEventListener('load', loadHandler);
+    
+    // Append to the container
+    modelViewerContainer.appendChild(modelViewer);
+    
+    // Store event handlers for cleanup
+    const eventHandlers = { progressHandler, errorHandler, arStatusHandler, loadHandler };
+    
+    // Cleanup function
+    return () => {
+      // Mark as unmounted
+      isMounted.current = false;
+      modelViewerCreated.current = false;
+      
+      // Remove event listeners
+      const mv = modelViewerRef.current;
+      if (mv) {
+        mv.removeEventListener('progress', eventHandlers.progressHandler);
+        mv.removeEventListener('error', eventHandlers.errorHandler);
+        mv.removeEventListener('ar-status', eventHandlers.arStatusHandler);
+        mv.removeEventListener('load', eventHandlers.loadHandler);
+      }
+      
+      // Save references to elements we need to clean up
+      const savedContainer = containerRefValue.current;
+      
+      // Use setTimeout to ensure our cleanup happens after React's reconciliation
+      setTimeout(() => {
+        try {
+          if (savedContainer && document.body.contains(savedContainer)) {
+            // Use a safe emptying technique
+            while (savedContainer.firstChild) {
+              savedContainer.removeChild(savedContainer.firstChild);
+            }
+          }
+        } catch (e) {
+          console.warn('Error during model viewer cleanup:', e);
+        }
+      }, 10);
+    };
   }, [
-    absoluteGlbUrl,
-    absoluteUsdzUrl,
-    alt,
+    scriptLoaded, 
+    absoluteGlbUrl, 
+    absoluteUsdzUrl, 
+    alt, 
     poster,
     cameraControls,
     autoRotate,
     exposure,
     shadowIntensity,
-    scriptLoaded,
     scale,
     position,
+    isMobileDevice,
+    isIOSDevice
   ]);
 
   return (
@@ -190,7 +285,7 @@ export default function ARViewer({
         ) : (
           <div
             ref={containerRef}
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full flex items-center justify-center relative"
           >
             {!scriptLoaded ? (
               <div className="flex flex-col items-center justify-center">
@@ -212,6 +307,19 @@ export default function ARViewer({
                 </p>
               </div>
             ) : null}
+            
+            {/* AR Experience message */}
+            {inARMode && (
+              <div className="absolute bottom-4 left-4 right-4 z-10 text-center pointer-events-none">
+                <div className="inline-block bg-white/80 dark:bg-gray-800/80 rounded-lg py-2 px-4 shadow-lg">
+                  <p className="text-sm text-gray-800 dark:text-gray-200">
+                    {isIOSDevice 
+                      ? "Move your device to place the object" 
+                      : "Tap on a surface to place the object"}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -3,43 +3,56 @@
 import { useState, useEffect } from "react";
 import { Product } from "@/types/product";
 import { products } from "@/data/products";
-import ARViewer from "@/components/ARViewer";
+import ClientSideARWrapper from "@/components/ClientSideARWrapper";
 import QRCode from "@/components/QRCode";
 import Link from "next/link";
 
 interface ProductPageProps {
   product: Product | null;
   productId: string;
-  initialView?: string; // Add the new prop that comes from searchParams
+  initialView?: string;
 }
 
 export default function ProductPage({ product, productId, initialView }: ProductPageProps) {
   const [currentUrl, setCurrentUrl] = useState<string>("");
   const [isARSupported, setIsARSupported] = useState<boolean | null>(null);
-  // Track if device is iOS for instructions
   const [isIOS, setIsIOS] = useState<boolean>(false);
-  // Remove unused state variable
   const [activeView, setActiveView] = useState<string>(initialView || "3d");
+  // Add mobile detection
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  // Add fullscreen AR mode for mobile
+  const [fullscreenAR, setFullscreenAR] = useState<boolean>(false);
 
   useEffect(() => {
-    // Generate AR-specific URL for QR code (with view=ar parameter)
-    const url = new URL(window.location.href);
-    url.searchParams.set('view', 'ar');
-    setCurrentUrl(url.toString());
+    // Get the current URL for QR code generation
+    setCurrentUrl(window.location.href);
     
-    // Check if AR is supported
-    const checkARSupport = () => {
-      // iOS Safari
+    // Check if device is mobile and if AR is supported
+    const checkDevice = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      // Check if mobile device
+      const mobileDevice = /iphone|ipad|ipod|android|mobile|tablet/.test(userAgent);
+      setIsMobile(mobileDevice);
+      
+      // Check AR support
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      // Android Chrome
-      const isAndroidDevice = /android/i.test(navigator.userAgent);
+      const isIOSDevice = /ipad|iphone|ipod/.test(userAgent) && !(window as any).MSStream;
+      const isAndroidDevice = /android/.test(userAgent);
       setIsIOS(isIOSDevice);
-      // We no longer need to set isAndroid state since we're not using it
       setIsARSupported(isIOSDevice || isAndroidDevice);
+      
+      // Auto-switch to AR view on mobile
+      if (mobileDevice && !initialView) {
+        setActiveView("ar");
+        // Check if URL has ar=true parameter to enable fullscreen AR mode
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('ar') === 'true') {
+          setFullscreenAR(true);
+        }
+      }
     };
     
-    checkARSupport();
+    checkDevice();
     
     // Update active view if initialView changes
     if (initialView) {
@@ -47,6 +60,7 @@ export default function ProductPage({ product, productId, initialView }: Product
     }
   }, [productId, initialView]);
 
+  // Loading state
   if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -55,15 +69,55 @@ export default function ProductPage({ product, productId, initialView }: Product
     );
   }
 
+  // Special fullscreen AR mode for mobile when scanned from QR
+  if (fullscreenAR && isMobile && isARSupported) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 relative">
+        <div className="fixed inset-0 z-10">
+          <ClientSideARWrapper
+            key={`${product.id}-fullscreen-ar`}
+            glbUrl={product.glbUrl}
+            usdzUrl={product.usdzUrl}
+            alt={product.name}
+            poster={product.image}
+            autoRotate={false}
+            viewMode="ar"
+          />
+        </div>
+        <div className="absolute top-4 left-4 z-20">
+          <button 
+            onClick={() => setFullscreenAR(false)} 
+            className="bg-white/80 dark:bg-gray-800/80 rounded-full p-2 shadow-lg"
+            aria-label="Close AR view"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div className="absolute bottom-4 left-4 right-4 z-20 text-center">
+          <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-3 shadow-lg inline-block">
+            <h3 className="text-lg font-medium">{product.name}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {isIOS 
+                ? "Move your device to place the item in your space" 
+                : "Tap on a surface to place the item in your space"}
+            </p>
+            {isIOS && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Use pinch gesture to resize the object
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular product view for desktop or mobile (when not in fullscreen AR)
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Show a debug note about the initial view if present (just for demonstration) */}
-      {initialView && (
-        <div className="bg-blue-50 text-blue-800 text-xs p-2 text-center">
-          View parameter: {initialView}
-        </div>
-      )}
-      
       {/* Navigation Bar */}
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -129,17 +183,49 @@ export default function ProductPage({ product, productId, initialView }: Product
             <div className="md:grid md:grid-cols-2">
               {/* AR Viewer Section - show based on active view */}
               <div className={`h-[400px] md:h-[600px] relative ${activeView !== "details" ? 'block' : 'hidden md:block'}`}>
-                <ARViewer
+                <ClientSideARWrapper
+                  key={`${product.id}-${activeView}`}
                   glbUrl={product.glbUrl}
                   usdzUrl={product.usdzUrl}
                   alt={product.name}
                   poster={product.image}
-                  // Adjust auto-rotate based on view
                   autoRotate={activeView === "3d"}
+                  viewMode={activeView}
                 />
                 
+                {/* Display QR code overlay for desktop users when in AR view */}
+                {!isMobile && activeView === "ar" && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md text-center">
+                      <h3 className="text-lg font-bold mb-3">Scan to view in AR</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                        Use your mobile device to scan this QR code and view this {product.category} in your space
+                      </p>
+                      <div className="bg-white p-4 rounded-lg inline-block mb-4">
+                        <QRCode url={`${currentUrl}?ar=true`} size={200} />
+                      </div>
+                      <div className="flex items-center gap-3 justify-center text-sm">
+                        <div className="flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="16" height="20" x="4" y="2" rx="2" ry="2"></rect>
+                            <line x1="12" y1="18" x2="12" y2="18.01"></line>
+                          </svg>
+                          iOS
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect>
+                            <path d="M12 18h.01"></path>
+                          </svg>
+                          Android
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {/* AR Support Message */}
-                {isARSupported === false && (
+                {isARSupported === false && !activeView.includes("details") && (
                   <div className="absolute bottom-4 left-4 right-4 bg-amber-50 dark:bg-amber-900/70 text-amber-800 dark:text-amber-200 rounded-md p-3 text-sm flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                       <circle cx="12" cy="12" r="10"></circle>
@@ -172,8 +258,27 @@ export default function ProductPage({ product, productId, initialView }: Product
                   </p>
                 </div>
                 
-                {/* Only show QR section in AR view */}
-                {(activeView === "ar" || activeView === "3d") && (
+                {/* Mobile AR prompt if on mobile with AR support */}
+                {isMobile && isARSupported && (activeView === "3d" || activeView === "ar") && (
+                  <div className="mt-6">
+                    <button 
+                      onClick={() => setFullscreenAR(true)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg flex items-center justify-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.25 8.25 21 12m0 0-3.75 3.75M21 12h-9"></path>
+                        <circle cx="8" cy="12" r="6"></circle>
+                      </svg>
+                      View in your space
+                    </button>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">
+                      Place this {product.category} in your environment with AR
+                    </p>
+                  </div>
+                )}
+                
+                {/* Only show QR section in desktop non-AR view */}
+                {!isMobile && activeView !== "ar" && activeView !== "details" && (
                   <div className="mt-8">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                       View in Your Space
@@ -182,37 +287,13 @@ export default function ProductPage({ product, productId, initialView }: Product
                     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 md:p-6">
                       <div className="flex flex-col md:flex-row items-center gap-6">
                         <div className="border-2 border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-800">
-                          <QRCode url={currentUrl} size={150} />
+                          <QRCode url={`${currentUrl}?ar=true`} size={150} />
                         </div>
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900 dark:text-white mb-2">Scan with your phone</h4>
                           <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            To view this {product.category} in AR, scan this QR code with your mobile device. You will be able to rotate and position the model freely in your space.
+                            To view this {product.category} in AR, scan this QR code with your mobile device.
                           </p>
-                          
-                          {/* AR Instructions based on device type */}
-                          {isARSupported && (
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md mt-3 text-sm">
-                              <p className="font-medium mb-1">🔍 {isIOS ? 'iOS' : 'Android'} Instructions:</p>
-                              <ol className="list-decimal pl-5 space-y-1">
-                                <li>Tap the &quot;View in AR&quot; button when the model loads</li>
-                                <li>Allow camera access if prompted</li>
-                                {isIOS ? (
-                                  <>
-                                    <li>Position your phone over a flat surface</li>
-                                    <li>The {product.category} will appear in your environment</li>
-                                    <li>Use two fingers to rotate, move, or resize the model</li>
-                                  </>
-                                ) : (
-                                  <>
-                                    <li>Move your phone around to detect surfaces</li>
-                                    <li>Tap on the surface where you want to place the {product.category}</li>
-                                    <li>Use pinch gestures to resize and drag to reposition the model</li>
-                                  </>
-                                )}
-                              </ol>
-                            </div>
-                          )}
                           
                           <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mt-4">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

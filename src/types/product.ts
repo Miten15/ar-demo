@@ -6,5 +6,6 @@ export interface Product {
   glbUrl: string;
   usdzUrl: string;
   image: string;
-  category: 'bulb' | 'lamp' | 'tubelight' | 'fixture';
+  category: 'bulb' | 'lamp' | 'tubelight' | 'fixture' | 'lighting';
+  featured?: boolean;
 }
